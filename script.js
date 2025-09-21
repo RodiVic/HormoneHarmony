@@ -13,7 +13,7 @@ if ("serviceWorker" in navigator) {
    IndexedDB Setup
 =================================== */
 let db;
-const request = indexedDB.open("HormoneHarmonyDB", 1);
+const request = indexedDB.open("HormoneHarmonyDB", 2); // bump version to 2
 
 request.onupgradeneeded = (event) => {
   db = event.target.result;
@@ -29,6 +29,10 @@ request.onupgradeneeded = (event) => {
   }
   if (!db.objectStoreNames.contains("cycles")) {
     db.createObjectStore("cycles", { keyPath: "id", autoIncrement: true });
+  }
+  // ✅ New: Progress logs for weight & BMI
+  if (!db.objectStoreNames.contains("progressLogs")) {
+    db.createObjectStore("progressLogs", { keyPath: "timestamp" });
   }
 };
 
