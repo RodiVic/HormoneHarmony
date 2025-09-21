@@ -143,3 +143,30 @@ section {
     width: 100%;
   }
 }
+/* ================================
+   Navigation Bar
+=================================== */
+.navbar {
+  display: flex;
+  justify-content: space-around;
+  background: var(--purple-bg);
+  padding: 0.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--purple-text);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+
+.nav-btn.active {
+  border-bottom: 3px solid var(--dark-purple);
+  font-weight: bold;
+}
+
