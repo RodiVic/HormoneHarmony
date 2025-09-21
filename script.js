@@ -320,3 +320,26 @@ window.addEventListener("load", () => {
   renderMeds();
   renderCycles();
 });
+/* ================================
+   Navigation Menu
+=================================== */
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = btn.getAttribute("data-section");
+
+    // Hide all sections
+    document.querySelectorAll(".tab-section").forEach(sec =>
+      sec.classList.add("hidden")
+    );
+
+    // Show target section
+    document.getElementById(target).classList.remove("hidden");
+
+    // Update active nav button style
+    document.querySelectorAll(".nav-btn").forEach(b =>
+      b.classList.remove("active")
+    );
+    btn.classList.add("active");
+  });
+});
+
