@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hormone Harmony</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+</head>
+<body>
+  <!-- Onboarding Modal -->
+  <div id="onboardingModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Welcome to Hormone Harmony</h2>
+      <p>Tell us a bit about you (all fields optional):</p>
+      <form id="onboardingForm">
+        <label>Name: <input type="text" id="userName" /></label>
+        <label>Age: <input type="number" id="userAge" /></label>
+        <label>Height: <input type="text" id="userHeight" /></label>
+        <label>Weight: <input type="text" id="userWeight" /></label>
+        <button type="submit">Save & Continue</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <header>
+    <h1 id="greeting">Hormone Harmony</h1>
+  </header>
+
+  <main>
+    <!-- Symptom Tracker -->
+    <section>
+      <h2>Log Symptoms</h2>
+      <form id="symptomForm">
+        <label>Symptom:
+          <input type="text" id="symptomName" placeholder="Headache, Fatigue..." />
+        </label>
+        <label>Severity: 
+          <input type="range" id="symptomSeverity" min="0" max="10" />
+        </label>
+        <label>Notes:
+          <textarea id="symptomNotes"></textarea>
+        </label>
+        <button type="submit">Save Symptom</button>
+      </form>
+      <div id="symptomList"></div>
+    </section>
+
+    <!-- Medication Tracker -->
+    <section>
+      <h2>Medication / Hormone Log</h2>
+      <form id="medForm">
+        <label>Medication Name:
+          <input type="text" id="medName" />
+        </label>
+        <label>Dosage:
+          <input type="text" id="medDosage" />
+        </label>
+        <label>Site:
+          <select id="medSite">
+            <option value="">Select</option>
+            <option value="Injection">Injection</option>
+            <option value="Patch">Patch</option>
+            <option value="Oral">Oral</option>
+          </select>
+        </label>
+        <label>Doctor/Pharmacy:
+          <input type="text" id="medInfo" />
+        </label>
+        <button type="submit">Save Medication</button>
+      </form>
+      <div id="medList"></div>
+    </section>
+
+    <!-- Period Tracker -->
+    <section>
+      <h2>Period Tracker</h2>
+      <button id="startPeriod">Start Period</button>
+      <button id="endPeriod">End Period</button>
+      <textarea id="periodNotes" placeholder="Notes..."></textarea>
+      <div id="cycleHistory"></div>
+    </section>
+
+    <!-- Backup / Restore -->
+    <section>
+      <h2>Backup & Restore</h2>
+      <button id="exportCSV">Export as CSV</button>
+      <button id="exportEncrypted">Export Encrypted</button>
+      <input type="file" id="importBackup" />
+    </section>
+  </main>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
