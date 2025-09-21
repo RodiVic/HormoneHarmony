@@ -342,4 +342,93 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.classList.add("active");
   });
 });
+/* ================================
+   Progress Tracker (Weight & BMI)
+=================================== */
+document.getElementById("progressForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const weight = parseFloat(document.getElementById("weightInput").value);
+  if (!weight) return alert("Please enter your weight");
+
+  // Get stored profile for height
+  const tx = db.transaction(["userProfile"], "readonly");
+  const store = tx.objectStore("userProfile");
+  const req = store.get("main");
+
+  req.onsuccess = async () => {
+    const profile = req.result;
+    const heightCm = parseFloat(profile?.height || 170); // fallback if missing
+    const heightM = heightCm / 100;
+
+    const bmi = (weight / (heightM * heightM)).toFixed(1);
+
+    const entry = {
+      timestamp: Date.now(),
+      weight,
+      bmi
+    };
+
+    await saveData("progressLogs", entry);
+    renderProgress();
+    e.target.reset();
+  };
+});
+
+/* ================================
+   Render BMI Chart
+=================================== */
+async function renderProgress() {
+  const logs = await getAllData("progressLogs");
+  if (!logs.length) return;
+
+  const ctx = document.getElementById("bmiChart").getContext("2d");
+
+  const labels = logs.map(l => new Date(l.timestamp).toLocaleDateString());
+  const weights = logs.map(l => l.weight);
+  const bmis = logs.map(l => l.bmi);
+
+  if (window.bmiChartInstance) {
+    window.bmiChartInstance.destroy();
+  }
+
+  window.bmiChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Weight (kg)",
+          data: weights,
+          borderColor: "#6b4483",
+          fill: false,
+          yAxisID: "y"
+        },
+        {
+          label: "BMI",
+          data: bmis,
+          borderColor: "#fb4889",
+          fill: false,
+          yAxisID: "y1"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Weight (kg)" }
+        },
+        y1: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "BMI" },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
 
