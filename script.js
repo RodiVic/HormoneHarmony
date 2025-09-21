@@ -13,7 +13,7 @@ if ("serviceWorker" in navigator) {
    IndexedDB Setup
 =================================== */
 let db;
-const request = indexedDB.open("HormoneHarmonyDB", 2); // bump version to 2
+const request = indexedDB.open("HormoneHarmonyDB", 2); // bumped version
 
 request.onupgradeneeded = (event) => {
   db = event.target.result;
@@ -30,7 +30,6 @@ request.onupgradeneeded = (event) => {
   if (!db.objectStoreNames.contains("cycles")) {
     db.createObjectStore("cycles", { keyPath: "id", autoIncrement: true });
   }
-  // ✅ New: Progress logs for weight & BMI
   if (!db.objectStoreNames.contains("progressLogs")) {
     db.createObjectStore("progressLogs", { keyPath: "timestamp" });
   }
@@ -40,6 +39,11 @@ request.onsuccess = (event) => {
   db = event.target.result;
   console.log("IndexedDB initialized");
   loadUserProfile();
+  renderSymptoms();
+  renderMeds();
+  renderCycles();
+  renderProgress();
+  updateDashboard();
 };
 
 request.onerror = (event) => {
@@ -116,6 +120,7 @@ document.getElementById("symptomForm").addEventListener("submit", async (e) => {
 
   await saveData("symptomLogs", log);
   renderSymptoms();
+  updateDashboard();
   e.target.reset();
 });
 
@@ -146,6 +151,7 @@ document.getElementById("medForm").addEventListener("submit", async (e) => {
 
   await saveData("medLogs", log);
   renderMeds();
+  updateDashboard();
   e.target.reset();
 });
 
@@ -181,7 +187,6 @@ document.getElementById("endPeriod").addEventListener("click", async () => {
   await saveData("cycles", currentCycle);
   currentCycle = null;
   renderCycles();
-  document.getElementById("periodNotes").value = "";
   alert("Period ended and saved.");
 });
 
@@ -215,9 +220,89 @@ async function renderCycles() {
 }
 
 /* ================================
+   Progress Tracker (Weight & BMI)
+=================================== */
+document.getElementById("progressForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const weight = parseFloat(document.getElementById("weightInput").value);
+  if (!weight) return alert("Please enter your weight");
+
+  const tx = db.transaction(["userProfile"], "readonly");
+  const store = tx.objectStore("userProfile");
+  const req = store.get("main");
+
+  req.onsuccess = async () => {
+    const profile = req.result;
+    const heightCm = parseFloat(profile?.height || 170);
+    const heightM = heightCm / 100;
+    const bmi = (weight / (heightM * heightM)).toFixed(1);
+
+    const entry = { timestamp: Date.now(), weight, bmi };
+    await saveData("progressLogs", entry);
+    renderProgress();
+    updateDashboard();
+    e.target.reset();
+  };
+});
+
+async function renderProgress() {
+  const logs = await getAllData("progressLogs");
+  if (!logs.length) return;
+
+  const ctx = document.getElementById("bmiChart").getContext("2d");
+  const labels = logs.map(l => new Date(l.timestamp).toLocaleDateString());
+  const weights = logs.map(l => l.weight);
+  const bmis = logs.map(l => l.bmi);
+
+  if (window.bmiChartInstance) window.bmiChartInstance.destroy();
+
+  window.bmiChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Weight (kg)", data: weights, borderColor: "#6b4483", fill: false, yAxisID: "y" },
+        { label: "BMI", data: bmis, borderColor: "#fb4889", fill: false, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { type: "linear", position: "left", title: { display: true, text: "Weight (kg)" } },
+        y1: { type: "linear", position: "right", title: { display: true, text: "BMI" }, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+}
+
+/* ================================
+   Dashboard Stats Update
+=================================== */
+async function updateDashboard() {
+  const symptoms = await getAllData("symptomLogs");
+  const meds = await getAllData("medLogs");
+  document.getElementById("symptomCount").textContent = symptoms.length;
+  document.getElementById("medCount").textContent = meds.length;
+
+  const progress = await getAllData("progressLogs");
+  if (progress.length > 0) {
+    const latest = progress[progress.length - 1];
+    document.getElementById("latestWeight").textContent = `${latest.weight} kg`;
+    document.getElementById("latestBMI").textContent = latest.bmi;
+    if (progress.length > 1) {
+      const prev = progress[progress.length - 2];
+      const trend = latest.bmi > prev.bmi ? "⬆️" : latest.bmi < prev.bmi ? "⬇️" : "➡️";
+      document.getElementById("bmiTrend").textContent = trend;
+    }
+  }
+}
+
+/* ================================
    Backup & Export
 =================================== */
 function exportCSV(data, filename) {
+  if (!data.length) return;
   const csv = [
     Object.keys(data[0]).join(","),
     ...data.map(row => Object.values(row).join(","))
@@ -234,44 +319,37 @@ document.getElementById("exportCSV").addEventListener("click", async () => {
   const symptoms = await getAllData("symptomLogs");
   const meds = await getAllData("medLogs");
   const cycles = await getAllData("cycles");
-
+  const progress = await getAllData("progressLogs");
   if (symptoms.length) exportCSV(symptoms, "symptoms.csv");
   if (meds.length) exportCSV(meds, "medications.csv");
   if (cycles.length) exportCSV(cycles, "cycles.csv");
+  if (progress.length) exportCSV(progress, "progress.csv");
 });
 
-// Encrypted export/import (basic AES)
+// Encryption helpers
 async function encryptData(data, passphrase) {
   const enc = new TextEncoder();
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveKey"]
-  );
+  const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveKey"]);
   const key = await window.crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: enc.encode("hormoneharmony"), iterations: 100000, hash: "SHA-256" },
     keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
   );
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(data))
-  );
+  const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(data)));
   return { encrypted: Array.from(new Uint8Array(encrypted)), iv: Array.from(iv) };
 }
 
 async function decryptData(encryptedData, passphrase) {
   const enc = new TextEncoder();
   const dec = new TextDecoder();
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveKey"]
-  );
+  const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveKey"]);
   const key = await window.crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: enc.encode("hormoneharmony"), iterations: 100000, hash: "SHA-256" },
     keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
   );
   const iv = new Uint8Array(encryptedData.iv);
   const data = new Uint8Array(encryptedData.encrypted);
-  const decrypted = await window.crypto.subtle.decrypt(
-    { name: "AES-GCM", iv }, key, data
-  );
+  const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
   return JSON.parse(dec.decode(decrypted));
 }
 
@@ -280,11 +358,11 @@ document.getElementById("exportEncrypted").addEventListener("click", async () =>
     profile: await getAllData("userProfile"),
     symptoms: await getAllData("symptomLogs"),
     meds: await getAllData("medLogs"),
-    cycles: await getAllData("cycles")
+    cycles: await getAllData("cycles"),
+    progress: await getAllData("progressLogs")
   };
   const passphrase = prompt("Enter passphrase for encryption:");
   if (!passphrase) return;
-
   const encrypted = await encryptData(allData, passphrase);
   const blob = new Blob([JSON.stringify(encrypted)], { type: "application/json" });
   const link = document.createElement("a");
@@ -307,132 +385,27 @@ document.getElementById("importBackup").addEventListener("change", async (e) => 
     restored.symptoms?.forEach(s => saveData("symptomLogs", s));
     restored.meds?.forEach(m => saveData("medLogs", m));
     restored.cycles?.forEach(c => saveData("cycles", c));
+    restored.progress?.forEach(p => saveData("progressLogs", p));
     alert("Backup restored successfully!");
     renderSymptoms();
     renderMeds();
     renderCycles();
+    renderProgress();
+    updateDashboard();
   } catch (err) {
     alert("Failed to decrypt backup. Wrong passphrase?");
   }
 });
 
 /* ================================
-   Initial Render
-=================================== */
-window.addEventListener("load", () => {
-  renderSymptoms();
-  renderMeds();
-  renderCycles();
-});
-/* ================================
    Navigation Menu
 =================================== */
 document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const target = btn.getAttribute("data-section");
-
-    // Hide all sections
-    document.querySelectorAll(".tab-section").forEach(sec =>
-      sec.classList.add("hidden")
-    );
-
-    // Show target section
+    document.querySelectorAll(".tab-section").forEach(sec => sec.classList.add("hidden"));
     document.getElementById(target).classList.remove("hidden");
-
-    // Update active nav button style
-    document.querySelectorAll(".nav-btn").forEach(b =>
-      b.classList.remove("active")
-    );
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
   });
 });
-/* ================================
-   Progress Tracker (Weight & BMI)
-=================================== */
-document.getElementById("progressForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const weight = parseFloat(document.getElementById("weightInput").value);
-  if (!weight) return alert("Please enter your weight");
-
-  // Get stored profile for height
-  const tx = db.transaction(["userProfile"], "readonly");
-  const store = tx.objectStore("userProfile");
-  const req = store.get("main");
-
-  req.onsuccess = async () => {
-    const profile = req.result;
-    const heightCm = parseFloat(profile?.height || 170); // fallback if missing
-    const heightM = heightCm / 100;
-
-    const bmi = (weight / (heightM * heightM)).toFixed(1);
-
-    const entry = {
-      timestamp: Date.now(),
-      weight,
-      bmi
-    };
-
-    await saveData("progressLogs", entry);
-    renderProgress();
-    e.target.reset();
-  };
-});
-
-/* ================================
-   Render BMI Chart
-=================================== */
-async function renderProgress() {
-  const logs = await getAllData("progressLogs");
-  if (!logs.length) return;
-
-  const ctx = document.getElementById("bmiChart").getContext("2d");
-
-  const labels = logs.map(l => new Date(l.timestamp).toLocaleDateString());
-  const weights = logs.map(l => l.weight);
-  const bmis = logs.map(l => l.bmi);
-
-  if (window.bmiChartInstance) {
-    window.bmiChartInstance.destroy();
-  }
-
-  window.bmiChartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Weight (kg)",
-          data: weights,
-          borderColor: "#6b4483",
-          fill: false,
-          yAxisID: "y"
-        },
-        {
-          label: "BMI",
-          data: bmis,
-          borderColor: "#fb4889",
-          fill: false,
-          yAxisID: "y1"
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          type: "linear",
-          position: "left",
-          title: { display: true, text: "Weight (kg)" }
-        },
-        y1: {
-          type: "linear",
-          position: "right",
-          title: { display: true, text: "BMI" },
-          grid: { drawOnChartArea: false }
-        }
-      }
-    }
-  });
-}
-
