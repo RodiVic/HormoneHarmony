@@ -1,0 +1,28 @@
+{
+  "name": "Hormone Harmony",
+  "short_name": "HormoneHarmony",
+  "description": "A private, offline-first health tracker for hormone therapy, medications, and menstrual cycles.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fdf9f4",
+  "theme_color": "#cdb5dd",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
